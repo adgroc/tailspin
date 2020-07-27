@@ -1,0 +1,41 @@
+name: models
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+    - Tailspin.SpaceGame.Web.Models/*
+    - .github/workflows/models.yml
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-18.04
+
+    steps:
+    - uses: actions/checkout@master
+
+    - name: Set up .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.102'
+    
+    - name: Restore packages for the models project
+      run: dotnet restore Tailspin.SpaceGame.Web.Models/Tailspin.SpaceGame.Web.Models.csproj 
+
+    - name: Build the models project
+      run: dotnet build Tailspin.SpaceGame.Web.Models/Tailspin.SpaceGame.Web.Models.csproj --no-restore --configuration Release
+    
+    - name: Pack the models project
+      run: dotnet pack Tailspin.SpaceGame.Web.Models/Tailspin.SpaceGame.Web.Models.csproj --no-restore --no-build --configuration Release -p:PackageVersion=0.0.$GITHUB_RUN_NUMBER
+
+    - name: Set up GPR
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.102'
+        source-url: https://nuget.pkg.github.com/adgroc/index.json
+      env:
+        NUGET_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
+
+    - name: Push the models package
+      run: dotnet nuget push Tailspin.SpaceGame.Web.Models/bin/Release/Tailspin.SpaceGame.Web.Models.0.0.$GITHUB_RUN_NUMBER.nupkg
