@@ -1,0 +1,61 @@
+name: web
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+    - Tailspin.SpaceGame.Web/*
+    - Tailspin.SpaceGame.Web.Tests/*
+    - .github/workflows/web.yml
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@master
+
+    - name: Set up .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '3.1.200'
+
+    - name: Set up npm
+      uses: actions/setup-node@v1
+      with:
+        node-version: '12.x'
+
+    - name: Run npm install
+      run: npm install
+
+    - name: Compile Sass assets
+      run: ./node_modules/.bin/node-sass Tailspin.SpaceGame.Web/wwwroot --output Tailspin.SpaceGame.Web/wwwroot
+      shell: bash
+
+    - name: Run gulp tasks
+      run: gulp
+      shell: bash
+
+    - name: Add GPR as package source
+      run: dotnet nuget add source --username ${{secrets.USERNAME}} --password ${{secrets.GPRPAT}} --name github https://nuget.pkg.github.com/adgroc/index.json
+
+    - name: Build with web project
+      run: dotnet build Tailspin.SpaceGame.Web/Tailspin.SpaceGame.Web.csproj --configuration Release
+    
+    - name: Build the unit test project
+      run: dotnet build Tailspin.SpaceGame.Web.Tests/Tailspin.SpaceGame.Web.Tests.csproj --configuration Release
+    
+    - name: Run the unit test
+      run: dotnet test Tailspin.SpaceGame.Web.Tests/Tailspin.SpaceGame.Web.Tests.csproj --configuration Release
+
+    - name: dotnet publish
+      run: dotnet publish Tailspin.SpaceGame.Web/Tailspin.SpaceGame.Web.csproj -c Release -o ${{env.DOTNET_ROOT}}/myapp
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v1
+      with:
+        app-name: 'usocp-tailspin'
+        slot-name: 'production'
+        publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE }}
+        package: ${{env.DOTNET_ROOT}}/myapp 
